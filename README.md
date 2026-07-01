@@ -27,7 +27,7 @@ https://ironfist-ai-resume-analyzer.streamlit.app/
 
 ## 👨‍💻 Developer
 
-Sohaib Wani
+Ironfist
 Deepak Bora
 Tashi tsh Lepcha
 Aashish Lepcha
