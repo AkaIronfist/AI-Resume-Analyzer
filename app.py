@@ -1,6 +1,7 @@
 import streamlit as st
 import pickle
 import pdfplumber
+import re
 
 st.set_page_config(
 
@@ -20,6 +21,34 @@ def calculate_score(text):
 
     score = 0
     text = text.lower()
+
+
+    # Contact Information Score (Max 10)
+    if re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text):
+        score += 5
+
+
+    if re.search(r"\b\d{10}\b", text):
+        score += 5
+
+
+        # Professional Links Score (Max 5)
+
+        links_score = 0
+
+        if "linkedin.com" in text:
+            links_score += 2
+
+
+        if "github.com" in text:
+            links_score += 2
+
+
+        if "portfolio" in text or "portfolio:" in text or "behance.net" in text:
+            links_score += 1
+
+
+        score += links_score
 
     education_keywords = [
         "education",
@@ -60,22 +89,106 @@ def calculate_score(text):
     ]
 
     if any(keyword in text for keyword in education_keywords):
-        score += 20
 
-    if any(keyword in text for keyword in skills_keywords):
-        score += 20
+        if any(degree in text for degree in [
+            "phd",
+            "doctorate",
+            "master",
+            "m.tech",
+            "mba"
+        ]):
+            score += 15
 
-    if any(keyword in text for keyword in project_keywords):
-        score += 20
 
-    elif any(keyword in text for keyword in experience_keywords):
+        elif any(degree in text for degree in [
+            "bachelor",
+            "b.tech",
+            "bca",
+            "b.sc",
+            "ba",
+            "bcom"
+        ]):
+            score += 12
+
+
+        elif any(degree in text for degree in [
+            "diploma",
+            "12th",
+            "higher secondary"
+        ]):
+            score += 8
+
+
+        else:
+            score += 5
+
+
+    found_skills = extract_skills(text)
+
+    if len(found_skills) >= 12:
+        score += 30
+
+
+    elif len(found_skills) >= 8:
+        score += 22
+
+
+    elif len(found_skills) >= 5:
+        score += 15
+
+
+    elif len(found_skills) >= 2:
+        score += 8
+
+
+    project_count = text.count("project")
+
+    if project_count >= 4:
+        score += 25
+    elif project_count == 3:
         score += 20
+    elif project_count == 2:
+        score += 15
+    elif project_count == 1:
+        score += 8
+
 
     if any(keyword in text for keyword in experience_keywords):
-        score += 20
 
-    if any(keyword in text for keyword in certification_keywords):
-        score += 20
+        if any(keyword in text for keyword in experience_keywords):
+
+            if any(word in text for word in [
+                "5 years", "6 years", "7 years", "8 years", "9 years", "10 years"
+            ]):
+                score += 25
+
+            elif any(word in text for word in [
+                "2 years", "3 years", "4 years"
+            ]):
+                score += 18
+
+            elif any(word in text for word in [
+                "intern", "internship", "6 months", "3 months", "1 month", "fresher"
+            ]):
+                score += 12
+
+            else:
+                score += 5
+
+
+    cert_count = (
+            text.count("certification") +
+            text.count("certifications") +
+            text.count("certificate")
+    )
+
+    if cert_count >= 3:
+        score += 10
+
+
+    elif cert_count >= 1:
+        score += 5
+
 
     return score
 def get_suggestions(text):
@@ -238,13 +351,19 @@ def create_pdf_report(prediction, skills, score, suggestions):
     story.append(Paragraph(f"<b>Resume Score:</b> {score}/100", styles["Normal"]))
 
     if score >= 90:
-        rating = "Excellent Resume"
+        rating = "⭐⭐⭐⭐⭐ Excellent"
+
     elif score >= 75:
-        rating = "Good Resume"
-    elif score >= 50:
-        rating = "Average Resume"
+        rating = "⭐⭐⭐⭐ Good"
+
+    elif score >= 60:
+        rating = "⭐⭐⭐ Average"
+
+    elif score >= 40:
+        rating = "⭐⭐ Needs Improvement"
+
     else:
-        rating = "Needs Improvement"
+        rating = "⭐ Poor Resume"
 
     story.append(Paragraph(f"<b>Resume Rating:</b> {rating}", styles["Normal"]))
     story.append(Paragraph("<br/>", styles["Normal"]))
@@ -469,6 +588,7 @@ if uploaded_file is not None:
 
         skills = extract_skills(resume_text)
         score = calculate_score(resume_text)
+
         suggestions= get_suggestions(resume_text)
 
         st.success("Analysis Complete!")
@@ -648,6 +768,21 @@ if uploaded_file is not None:
 
         with col2:
 
+            if score >= 90:
+                rating = "⭐⭐⭐⭐⭐ Excellent Resume"
+
+            elif score >= 75:
+                rating = "⭐⭐⭐⭐ Good Resume"
+
+            elif score >= 60:
+                rating = "⭐⭐⭐ Average Resume"
+
+            elif score >= 40:
+                rating = "⭐⭐ Needs Improvement"
+
+            else:
+                rating = "⭐ Poor Resume"
+
             st.markdown(f"""
 
             <div class="score-card">
@@ -658,16 +793,21 @@ if uploaded_file is not None:
 
             </div>
 
-
             <div class="score-title">
 
             📊 Resume Score
 
             </div>
 
+            <br>
+
+            <div style="font-size:22px;font-weight:bold;color:#FFD700;">
+
+            {rating}
 
             </div>
 
+            </div>
 
             """, unsafe_allow_html=True)
 
@@ -702,61 +842,58 @@ if uploaded_file is not None:
 
             for suggestion in suggestions:
                 report += f"\n- {suggestion}"
-                pdf_report = create_pdf_report(
-                    prediction[0],
-                    skills,
-                    score,
-                    suggestions
-                )
 
-                st.markdown("""
+            pdf_report = create_pdf_report(
+                prediction[0],
+                skills,
+                score,
+                suggestions
+            )
 
-                <style>
+            st.markdown("""
+            <style>
 
-                .stDownloadButton button {
+            .stDownloadButton button {
 
-                    width:100%;
+                width:100%;
 
-                    background:#111;
+                background:#111;
 
-                    color:white;
+                color:white;
 
-                    border:2px solid #39ff14;
+                border:2px solid #39ff14;
 
-                    border-radius:15px;
+                border-radius:15px;
 
-                    padding:12px;
+                padding:12px;
 
-                    font-size:18px;
+                font-size:18px;
 
-                    font-weight:bold;
+                font-weight:bold;
 
-                    box-shadow:0 0 12px #39ff14;
+                box-shadow:0 0 12px #39ff14;
 
-                }
+            }
 
+            .stDownloadButton button:hover {
 
-                .stDownloadButton button:hover {
+                background:#39ff14;
 
-                    background:#39ff14;
+                color:black;
 
-                    color:black;
+            }
 
-                }
+            </style>
+            """, unsafe_allow_html=True)
 
+            st.download_button(
 
-                </style>
+                label="📄 Download PDF Report",
 
-                """, unsafe_allow_html=True)
+                data=pdf_report,
 
-                st.download_button(
+                file_name="AI_Resume_Analysis_Report.pdf",
 
-                    label="📄 Download PDF Report",
+                mime="application/pdf"
 
-                    data=pdf_report,
-
-                    file_name="AI_Resume_Analysis_Report.pdf",
-
-                    mime="application/pdf"
-
-                )
+            )
